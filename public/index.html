@@ -10,49 +10,85 @@
       margin: 0 auto;
       background-color: black;
     }
+    body {
+      text-align: center;
+      background-color: darkslategray;
+      margin-inline: 10px;
+    }
+    button {
+      width: 80px;
+      height: 30px;
+      background-color: black;
+      color: white;
+      font-size: large;
+      border-color: white;
+    }
+    button:disabled{
+      background-color: darkslategray;
+    }
+    input {
+      text-align: center;
+      height: 25px;
+      font-size: large;
+      border-color: white;
+      background-color: black;
+      color: white;
+    }
+    #notes {
+      width: 400px;
+    }
   </style>
 </head>
 <body>
+  <input id="notes" type="text" value="press READY and wait for the other player"disabled>
+  <input id="placar" type="text" value="LEFT 0 x 0 RIGHT"disabled>
+  <button>Ready</button>
   <canvas id="gameCanvas" width="800" height="600"></canvas>
   <script src="/socket.io/socket.io.js"></script>
   <script >
+    const socket = io();
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
     let side = null;
+    let playerLeft = false
+    let playerRight = false
+    
+    const paddleHeight = 100;
+    const paddleWidth = 10;
+    const ballHeight = 10;
+    const ballWidth = 10;
+    
+    let leftPaddleY = (canvas.height - paddleHeight) / 2;
+    let rightPaddleY = (canvas.height - paddleHeight) / 2;
+    let ballPosition = { x: canvas.width/2, y: canvas.width/2}
+    let ballDelta = { x: 0, y: 0 }
+    
+    let button = document.querySelector('button');
+    let placar = document.getElementById('placar')
+    let notes = document.getElementById('notes')
 
     function chooseSide() {
       const input = prompt('Choose your side (left or right):');
-      if (input === 'left' || input === 'right') {
+      if(input === 'left'){
         side = input;
-      } else {
+      } else if (input === 'right'){
+        side = input;
+      }
+      else {
         alert('Invalid choice. Please choose "left" or "right".');
         chooseSide();
       }
     }
-
+      
     chooseSide();
+    socket.emit('choosedPaddle', side)
 
-
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const socket = io();
-
-    const paddleHeight = 100;
-    const paddleWidth = 10;
-
-    let leftPaddleY = (canvas.height - paddleHeight) / 2;
-    let rightPaddleY = (canvas.height - paddleHeight) / 2;
-
-    socket.on('updatePaddle', (data) => {
-      if (data.player === 'left') {
-        leftPaddleY = data.y;
-      } else {
-        rightPaddleY = data.y;
-      }
+    // player is ready button
+    button.addEventListener('click', () =>{
+      button.disabled = true
+      socket.emit('playerReady', 1)
     });
-
-    // canvas.addEventListener('mousemove', (event) => {
-    //   const mouseY = event.clientY - canvas.getBoundingClientRect().top;
-    //   socket.emit('updatePaddle', { player: side, y: mouseY - paddleHeight / 2 });
-    // });
 
     canvas.addEventListener('mousemove', (event) => {
       const mouseY = event.clientY - canvas.getBoundingClientRect().top;
@@ -64,20 +100,77 @@
       socket.emit('updatePaddle', { player: side, y: mouseY - paddleHeight / 2 });
     });
 
+    socket.on('updatePaddle', (data) => {
+      if (data.player === 'left') {
+        leftPaddleY = data.y;
+      } else {
+        rightPaddleY = data.y;
+      }
+    });
+
+    socket.on('updateScore', (data) => {
+      placar.value = 'LEFT ' +data.scoreLeft + ' x ' + data.scoreRight + ' RIGHT'
+      if(data.scoreLeft < 9 && data.scoreRight <9){
+        countdownGoal(data.goalOwner)
+      }
+    })
+
+    // countdown to restart after goal
+    function countdownGoal(goalOwner){
+      notes.value = 'GOAL from '+ goalOwner + "! Game restarting in: 3... "
+      setTimeout(() => {
+        notes.value += '2... '
+      }, 1000)
+      setTimeout(() => {
+        notes.value += '1... '
+      }, 2000)
+      setTimeout(() => {
+        notes.value = 'START!'
+      }, 3000)
+    }
+
+    // countdown to start the game
+    socket.on('gameStarting', () => {
+      notes.value = 'Game Starting in: 3... '
+      setTimeout(() => {
+        notes.value += '2... '
+      }, 1000)
+      setTimeout(() => {
+        notes.value += '1... '
+      }, 2000)
+      setTimeout(() => {
+        notes.value = 'START!'
+      }, 3000)
+    })
+
+    socket.on('gameOver', (winner) => {
+      notes.value = "GAME OVER! "+winner+" is the Winner!"
+    })
+
+    // receive from server the ball position
+    socket.on('updateBall', (data) => {
+      ballPosition.x = data.ballx
+      ballPosition.y = data.bally
+      ballDelta.x = data.deltax
+      ballDelta.y = data.deltay
+    })
 
     function draw() {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Desenhar paddles
+      ctx.beginPath()
+      
+      // draw ball
+      ctx.fillRect(ballPosition.x, ballPosition.y, ballWidth, ballHeight)
+      
+      // draw paddles
       ctx.fillStyle = 'white';
       ctx.fillRect(0, leftPaddleY, paddleWidth, paddleHeight);
       ctx.fillRect(canvas.width - paddleWidth, rightPaddleY, paddleWidth, paddleHeight);
 
-      requestAnimationFrame(draw);
+      requestAnimationFrame(draw)
     }
 
-    draw();
-
+    draw()
   </script>
 </body>
 </html>
