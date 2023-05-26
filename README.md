@@ -10,5 +10,5 @@ mouse, e a condição de vitória é marcar 9 gols primeiro.
 
 
 - Interface do jogador:
-- 
+
 ![image](https://github.com/davidonigit/Pong-Multiplayer/assets/93225780/4381b0a3-2ae5-4bdb-8ca8-73b32060aaf7)
